@@ -1,27 +1,33 @@
+#!/usr/bin/env python
+# -*- coding: UTF-8 -*-
+"""
+@ Date        : 12/11/2024 7:31 PM
+@ Author      : Poco Ray
+@ File        : test_web_login.py
+@ Description : Web login test case.
+"""
+
 import pytest
 from tests.test_base_case import BaseCaseWeb
 from utils.log_tool.log_control import INFO, ERROR
 
 
 class TestWebLogin(BaseCaseWeb):
-    """Web登录测试类"""
+    """ Web login test case. """
 
     @pytest.mark.web
     @pytest.mark.login
     def test_web_login(self):
-        """测试Web端登录功能"""
+        """ Success login test case. """
         try:
-            INFO.logger.info("开始执行 test_web_login 测试")
+            INFO.logger.info("Start testing the Web login function...")
             self.login()
             self.take_screenshot("after_login")
-            current = self.current_url
-            handle = self.current_window_handle
-            print(f"当前URL: {current}")
-            print(f"当前窗口句柄: {handle}")
             self.click("li:contains('特殊作业全过程')")
             self.sleep(1)
 
         except Exception as e:
-            ERROR.logger.error(f"测试执行失败: {str(e)}")
+            ERROR.logger.error(f"Failed to test the Web login function, error message: {str(e)}")
             self.take_screenshot("login_failed")
             raise
+        self.driver.switch_to.alert.accept()

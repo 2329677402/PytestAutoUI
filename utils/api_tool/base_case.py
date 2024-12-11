@@ -18,7 +18,8 @@ from utils.log_tool.log_control import INFO, ERROR
 from utils.api_tool.selector_util import SelectorUtil
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, WebDriverException, ElementClickInterceptedException
+from selenium.common.exceptions import TimeoutException, WebDriverException, ElementClickInterceptedException, \
+    NoSuchElementException
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.remote.webdriver import WebDriver
 from appium.webdriver.webdriver import WebDriver as AppDriver
@@ -272,9 +273,9 @@ class BaseCase:
             element = self.find_element(selector, by, timeout)
             element.clear()
             element.send_keys(text)
-            INFO.logger.info(f"Successfully entered text: {text} into the element: {selector} (by={by}).")
+            INFO.logger.info(f"Successfully entered text: <{text}> into the element: {selector} (by={by}).")
         except TimeoutException:
-            ERROR.logger.error(f"Timeout when entering text: {text} into the element: {selector} (by={by}).")
+            ERROR.logger.error(f"Timeout when entering text: <{text}> into the element: {selector} (by={by}).")
             self.take_screenshot("type_timeout")
             if retry:
                 self.type(selector, text, by, timeout, retry=False)
@@ -282,13 +283,13 @@ class BaseCase:
                 raise
         except Exception as e:
             ERROR.logger.error(
-                f"Failed to enter text: {text} into the element: {selector} (by={by}), error message: {str(e)}")
+                f"Failed to enter text: <{text}> into the element: {selector} (by={by}), error message: {str(e)}")
             self.take_screenshot("type_error")
             raise
 
     def is_element_present(self, selector: str, by: str = 'css_selector') -> bool:
         """
-        Check if the element exists.
+        Check if the element exists. (Only check if present, not check other)
 
         :param selector: Element selector.
         :param by: Locator method.
@@ -297,14 +298,166 @@ class BaseCase:
             is_present = self.is_element_present("#element_id")
         """
         try:
-            self.find_element(selector, by)
+            self.find_element(selector, by, suppress_logging=True)
             INFO.logger.info(f"Element found: {selector} (by={by}).")
             return True
-        except TimeoutException:
-            INFO.logger.info(f"Element not found (timeout): {selector} (by={by}).")
+        except (NoSuchElementException, TimeoutException):
+            INFO.logger.info(f"Element not found: {selector} (by={by}).")
             return False
         except Exception as e:
-            ERROR.logger.error(f"Failed to find element: {selector} (by={by}), error message: {str(e)}")
+            INFO.logger.error(f"An unexpected error occurred: {str(e)}")
+            return False
+
+    def is_element_visible(self, selector: str, by: str = 'css_selector') -> bool:
+        """
+        Check if the element is visible. (Only check if displayed, not check enabled)
+
+        :param selector: Element selector.
+        :param by: Locator method.
+        :return: 1. True: Element is visible. 2. False: Element is not visible.
+        :Usage:
+            is_visible = self.is_element_visible("#element_id")
+        """
+        try:
+            element = self.find_element(selector, by, suppress_logging=True)
+            return element.is_displayed()
+        except (NoSuchElementException, TimeoutException):
+            return False
+        except Exception as e:
+            ERROR.logger.error(f"An unexpected error occurred: {str(e)}")
+            return False
+
+    def is_element_enabled(self, selector: str, by: str = 'css_selector') -> bool:
+        """
+        Check if the element is enabled. (Only check if enabled, not check displayed)
+
+        :param selector: Element selector.
+        :param by: Locator method.
+        :return: 1. True: Element is enabled. 2. False: Element is not enabled.
+        :Usage:
+            is_enabled = self.is_element_enabled("#element_id")
+        """
+        try:
+            element = self.find_element(selector, by, suppress_logging=True)
+            return element.is_enabled()
+        except (NoSuchElementException, TimeoutException):
+            return False
+        except Exception as e:
+            ERROR.logger.error(f"An unexpected error occurred: {str(e)}")
+            return False
+
+    def is_element_clickable(self, selector: str, by: str = 'css_selector') -> bool:
+        """
+        Check if the element is clickable. (Check both displayed and enabled)
+
+        :param selector: Element selector.
+        :param by: Locator method.
+        :return: 1. True: Element is clickable. 2. False: Element is not clickable.
+        :Usage:
+            is_clickable = self.is_element_clickable("#element_id")
+        """
+        try:
+            element = self.find_element(selector, by, suppress_logging=True)
+            return element.is_displayed() and element.is_enabled()
+        except (NoSuchElementException, TimeoutException):
+            return False
+        except Exception as e:
+            ERROR.logger.error(f"An unexpected error occurred: {str(e)}")
+            return False
+
+    def is_element_selected(self, selector: str, by: str = 'css_selector') -> bool:
+        """
+        Check if the element is selected.
+
+        :param selector: Element selector.
+        :param by: Locator method.
+        :return: 1. True: Element is selected. 2. False: Element is not selected.
+        :Usage:
+            is_selected = self.is_element_selected("#element_id")
+        """
+        try:
+            element = self.find_element(selector, by, suppress_logging=True)
+            return element.is_selected()
+        except (NoSuchElementException, TimeoutException):
+            return False
+        except Exception as e:
+            ERROR.logger.error(f"An unexpected error occurred: {str(e)}")
+            return False
+
+    def is_exact_text_visible(self, text: str, selector: str, by: str = 'css_selector') -> bool:
+        """
+        Check if the exact text is visible in the element.
+
+        :param text: Text to check.
+        :param selector: Element selector.
+        :param by: Locator method.
+        :return: 1. True: Text is visible. 2. False: Text is not visible.
+        :Usage:
+            is_visible = self.is_exact_text_visible("example text", "#element_id")
+        """
+        try:
+            element = self.find_element(selector, by, suppress_logging=True)
+            return element.text == text
+        except (NoSuchElementException, TimeoutException):
+            return False
+        except Exception as e:
+            ERROR.logger.error(f"An unexpected error occurred: {str(e)}")
+            return False
+
+    def is_partial_text_visible(self, text: str, selector: str, by: str = 'css_selector') -> bool:
+        """
+        Check if the partial text is visible in the element.
+
+        :param text: Text to check.
+        :param selector: Element selector.
+        :param by: Locator method.
+        :return: 1. True: Text is visible. 2. False: Text is not visible.
+        :Usage:
+            is_visible = self.is_partial_text_visible("example text", "#element_id")
+        """
+        try:
+            element = self.find_element(selector, by, suppress_logging=True)
+            return text in element.text
+        except (NoSuchElementException, TimeoutException):
+            return False
+        except Exception as e:
+            ERROR.logger.error(f"An unexpected error occurred: {str(e)}")
+            return False
+
+    def is_exact_link_text_visible(self, link_text: str) -> bool:
+        """
+        Check if the exact link text is visible in the element.
+
+        :param link_text: Link text to check.
+        :return: 1. True: Link text is visible. 2. False: Link text is not visible.
+        :Usage:
+            is_visible = self.is_exact_link_text_visible("example link text")
+        """
+        try:
+            element = self.find_element(f'a:contains("{link_text}")', by='css_selector', suppress_logging=True)
+            return element.text == link_text
+        except (NoSuchElementException, TimeoutException):
+            return False
+        except Exception as e:
+            ERROR.logger.error(f"An unexpected error occurred: {str(e)}")
+            return False
+
+    def is_partial_link_text_visible(self, link_text: str) -> bool:
+        """
+        Check if the partial link text is visible in the element.
+
+        :param link_text: Link text to check.
+        :return: 1. True: Link text is visible. 2. False: Link text is not visible.
+        :Usage:
+            is_visible = self.is_partial_link_text_visible("example link text")
+        """
+        try:
+            element = self.find_element(f'a:contains("{link_text}")', by='css_selector', suppress_logging=True)
+            return link_text in element.text
+        except (NoSuchElementException, TimeoutException):
+            return False
+        except Exception as e:
+            ERROR.logger.error(f"An unexpected error occurred: {str(e)}")
             return False
 
     @staticmethod
@@ -605,13 +758,15 @@ class BaseCase:
             raise
         return self
 
-    def find_element(self, selector: str, by: str = 'css_selector', timeout: Optional[int] = None) -> CustomWebElement:
+    def find_element(self, selector: str, by: str = 'css_selector', timeout: Optional[int] = None,
+                     suppress_logging: bool = False) -> CustomWebElement:
         """
         Find a single element.
 
         :param selector: Element selector.
         :param by: Locator method.
         :param timeout: Timeout.
+        :param suppress_logging: Suppress logging if True.
         :return: WebElement object.
         :Usage:
             element = self.find_element("#element_id")
@@ -627,24 +782,29 @@ class BaseCase:
             element = temp_wait.until(
                 EC.presence_of_element_located(locator)
             )
-            INFO.logger.info(f"Successfully found the element: {selector} (by={by}).")
+            if not suppress_logging:
+                INFO.logger.info(f"Successfully found the element: {selector} (by={by}).")
             return CustomWebElement(self.driver, element.id)
         except TimeoutException:
-            ERROR.logger.error(f"Timeout when finding the element: {selector} (by={by}).")
-            self.take_screenshot("find_element_timeout")
+            if not suppress_logging:
+                ERROR.logger.error(f"Timeout when finding the element: {selector} (by={by}).")
+                self.take_screenshot("find_element_timeout")
             raise
         except Exception as e:
-            ERROR.logger.error(f"Failed to find the element: {selector} (by={by}), error message: {str(e)}")
-            self.take_screenshot("find_element_error")
+            if not suppress_logging:
+                ERROR.logger.error(f"Failed to find the element: {selector} (by={by}), error message: {str(e)}")
+                self.take_screenshot("find_element_error")
             raise
 
-    def find_elements(self, selector: str, by: str = 'css_selector', timeout: Optional[int] = None) -> List[WebElement]:
+    def find_elements(self, selector: str, by: str = 'css_selector', timeout: Optional[int] = None,
+                      suppress_logging: bool = False) -> List[WebElement]:
         """
         Find multiple elements.
 
         :param selector: Element selector.
         :param by: Locator method.
         :param timeout: Timeout.
+        :param suppress_logging: Suppress logging if True.
         :return: List of WebElement objects.
         :Usage:
             elements = self.find_elements(".element_class")
@@ -660,15 +820,18 @@ class BaseCase:
             elements = temp_wait.until(
                 EC.presence_of_all_elements_located(locator)
             )
-            INFO.logger.info(f"Successfully found the elements: {selector} (by={by}).")
+            if not suppress_logging:
+                INFO.logger.info(f"Successfully found the elements: {selector} (by={by}).")
             return elements
         except TimeoutException:
-            ERROR.logger.error(f"Timeout when finding the elements: {selector} (by={by}).")
-            self.take_screenshot("find_elements_timeout")
+            if not suppress_logging:
+                ERROR.logger.error(f"Timeout when finding the elements: {selector} (by={by}).")
+                self.take_screenshot("find_elements_timeout")
             raise
         except Exception as e:
-            ERROR.logger.error(f"Failed to find the elements: {selector} (by={by}), error message: {str(e)}")
-            self.take_screenshot("find_elements_error")
+            if not suppress_logging:
+                ERROR.logger.error(f"Failed to find the elements: {selector} (by={by}), error message: {str(e)}")
+                self.take_screenshot("find_elements_error")
             raise
 
     def send_keys(self, selector: str, text: str, by: str = 'css_selector') -> None:
@@ -1186,3 +1349,66 @@ class BaseCase:
             ERROR.logger.error(f"Failed to flick from ({start_x}, {start_y}) to ({end_x}, {end_y}), error message: {e}")
             raise
         return self
+
+    def alert_accept(self) -> None:
+        """
+        Accepts the alert.
+
+        :Usage:
+            self.alert_accept()
+        """
+        try:
+            self.driver.switch_to.alert.accept()
+            INFO.logger.info("Accepted the alert.")
+        except Exception as e:
+            ERROR.logger.error(f"Failed to accept the alert: {str(e)}")
+            self.take_screenshot("alert_accept_error")
+            raise
+
+    def alert_dismiss(self) -> None:
+        """
+        Dismisses the alert.
+
+        :Usage:
+            self.alert_dismiss()
+        """
+        try:
+            self.driver.switch_to.alert.dismiss()
+            INFO.logger.info("Dismissed the alert.")
+        except Exception as e:
+            ERROR.logger.error(f"Failed to dismiss the alert: {str(e)}")
+            self.take_screenshot("alert_dismiss_error")
+            raise
+
+    def alert_send_keys(self, text: str) -> None:
+        """
+        Sends keys to the alert.
+
+        :param text: Text to send.
+        :Usage:
+            self.alert_send_keys("example text")
+        """
+        try:
+            self.driver.switch_to.alert.send_keys(text)
+            INFO.logger.info(f"Sent keys to the alert: {text}.")
+        except Exception as e:
+            ERROR.logger.error(f"Failed to send keys to the alert: {str(e)}")
+            self.take_screenshot("alert_send_keys_error")
+            raise
+
+    def alert_text(self) -> str:
+        """
+        Gets the text of the alert.
+
+        :return: The text of the alert.
+        :Usage:
+            text = self.alert_text()
+        """
+        try:
+            text = self.driver.switch_to.alert.text
+            INFO.logger.info(f"Successfully obtained the alert text: {text}.")
+            return text
+        except Exception as e:
+            ERROR.logger.error(f"Failed to get the alert text: {str(e)}")
+            self.take_screenshot("alert_text_error")
+            raise

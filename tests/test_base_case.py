@@ -7,6 +7,8 @@
 @ Description : Web-side test base class and App-side test base class.
 """
 import pytest
+from selenium.webdriver.remote.webelement import WebElement
+
 from utils.api_tool.base_case import BaseCase
 from pages.page_app.page_app_login import PageAppLogin
 from pages.page_web.page_web_login import PageWebLogin
@@ -48,3 +50,12 @@ class BaseCaseApp(BaseCase):
     def login(self, username="admin", password="admin123"):
         """ App login implementation. """
         PageAppLogin.app_login(self, username, password)
+
+    # TODO: Implement the following methods in the BaseCase class.
+    def get_dept_data(self) -> list[str]:
+        """
+        Get department data.
+
+        :return: Department data.
+        """
+        pass

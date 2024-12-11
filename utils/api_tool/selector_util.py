@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 """
-@ Date        : 2024/12/2 下午9:42
+@ Date        : 12/11/2024 7:50 PM
 @ Author      : Poco Ray
 @ File        : selector_util.py
-@ Description : 选择器工具类，用于处理和转换各种类型的选择器
+@ Description : Selector tool class, used to process and convert various types of selectors.
 """
 import re
 from typing import Tuple
@@ -12,9 +12,9 @@ from selenium.webdriver.common.by import By
 
 
 class SelectorUtil:
-    """选择器工具类"""
+    """ Selector tool class. """
 
-    # 支持的定位方式映射
+    # Supported locator mapping.
     LOCATOR_MAP = {
         'id': By.ID,
         'name': By.NAME,
@@ -29,9 +29,10 @@ class SelectorUtil:
     @staticmethod
     def is_valid_by(by: str) -> bool:
         """
-        检查定位方式是否有效
-        :param by: 定位方式
-        :return: 是否有效
+        Check if the locator is valid.
+
+        :param by: Locator type.
+        :return: Whether the locator is valid.
         """
         valid_by = [
             'css_selector', 'id', 'name', 'xpath',
@@ -42,28 +43,30 @@ class SelectorUtil:
     @staticmethod
     def is_xpath_selector(selector: str) -> bool:
         """
-        判断是否为XPath选择器
-        :param selector: 选择器字符串
-        :return: 是否为XPath
+        Check if the selector is an XPath.
+
+        :param selector: Selector string.
+        :return: Whether the selector is an XPath.
         """
         return selector.strip().startswith(('/', './/', '('))
 
     @staticmethod
     def process_contains_selector(selector: str) -> Tuple[str, str]:
         """
-        处理包含:contains()的选择器
-        :param selector: CSS选择器
-        :return: (选择器, 定位方式)的元组
+        Process the :contains() selector.
+
+        :param selector: CSS selector string.
+        :return: Processed selector and locator type.
         """
-        # 匹配:contains('文本')或:contains("文本")模式
+        # Extract the text from the :contains() selector.
         contains_pattern = r':contains\([\'\"](.*?)[\'\"]\)'
         if ':contains(' in selector:
             text = re.search(contains_pattern, selector).group(1)
             base_selector = re.sub(contains_pattern, '', selector).strip()
 
-            # 转换为XPath表达式，使用更灵活的文本匹配方式
+            # Convert the :contains() selector to XPath.
             if base_selector:
-                # 如果有基础选择器，使用normalize-space()处理文本
+                # If there is a base selector, search for the text within the base selector.
                 xpath = (
                     f"//{base_selector}["
                     f"contains(normalize-space(.), '{text}') or "
@@ -73,7 +76,7 @@ class SelectorUtil:
                     f"]"
                 )
             else:
-                # 如果没有基础选择器，搜索所有元素
+                # If there is no base selector, search for the text in the entire document.
                 xpath = (
                     f"//*["
                     f"contains(normalize-space(.), '{text}') or "
@@ -89,25 +92,25 @@ class SelectorUtil:
     @classmethod
     def get_selenium_locator(cls, selector: str, by: str = 'css_selector') -> Tuple[str, str]:
         """
-        获取Selenium支持的定位器
-        :param selector: 选择器字符串
-        :param by: 定位方式
-        :return: (定位方式, 选择器)元组
+        Get the Selenium locator.
+        :param selector: Selector string.
+        :param by: Locator type.
+        :return: Tuple of locator type and selector string.
         """
         by = by.lower()
 
-        # 检查定位方式是否有效
+        # Check if the locator is valid.
         if not cls.is_valid_by(by):
             raise ValueError(f"不支持的定位方式: {by}")
 
-        # 处理XPath选择器
+        # Handle XPath selector.
         if cls.is_xpath_selector(selector):
             return By.XPATH, selector
 
-        # 处理:contains()选择器
+        # Handle :contains() selector.
         if by == 'css_selector' and ':contains(' in selector:
             selector, by = cls.process_contains_selector(selector)
             return By.XPATH, selector
 
-        # 返回标准定位器
+        # Return the locator type and selector.
         return cls.LOCATOR_MAP[by], selector
