@@ -51,7 +51,6 @@ class BaseCaseApp(BaseCase):
         """ App login implementation. """
         PageAppLogin.app_login(self, username, password)
 
-    # TODO: Implement the following methods in the BaseCase class.
     def get_dept_data(self) -> list[str]:
         """
         Get department data.

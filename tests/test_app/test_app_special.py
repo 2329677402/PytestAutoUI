@@ -6,6 +6,7 @@
 @ File        : test_app_special.py
 @ Description : 功能描述
 """
+import allure
 import pytest
 from tests.test_base_case import BaseCaseApp
 from utils.log_tool.log_control import ERROR, INFO
@@ -30,20 +31,30 @@ input_task_location = '//android.webkit.WebView[@text="pages/working/appointment
 task_detail_location = '//android.webkit.WebView[@text="pages/working/appointment/addForm[6]"]/android.view.View/android.view.View/android.view.View[3]/android.view.View/android.view.View/android.view.View/android.view.View/android.widget.EditText'
 
 
+@allure.feature("特殊作业")
+@pytest.mark.app
+@pytest.mark.special
 class TestAppSpecial(BaseCaseApp):
     """ Test App special function """
 
+    @allure.severity(allure.severity_level.BLOCKER)
+    @allure.title("处理特殊作业")
+    @pytest.mark.smoke
+    @pytest.mark.run(order=2)
     def test_app_special(self):
         """ Test App special function """
         try:
             INFO.logger.info("Start testing the App special function...")
             self.login()
-            self.click(special_task)
-            self.click(ticket_reservation)
+            self.sleep(2)
+            # assert self.is_element_visible('//*[@text="操作成功"]') is True
+            self.find_element(special_task).click()
+            self.find_element(ticket_reservation).click()
             self.take_screenshot("作业预约页面")
-            self.click(add_btn)
+            # self.driver.save_screenshot("作业预约页面.png")
+            self.find_element(add_btn).click()
             self.take_screenshot("添加作业票详情")
-            self.click(task_unit_list)
+            self.find_element(task_unit_list).click()
 
         except Exception as e:
             ERROR.logger.error(f"Failed to test the App special function, error message: {str(e)}")

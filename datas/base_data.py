@@ -9,9 +9,10 @@
 import requests
 import json
 
-# TODO: Implement the following methods in the BaseCase class.
-class ApiHelper:
-    """ API Helper class """
+
+class ApiData:
+    def __init__(self, _base_url):
+        self.base_url = _base_url
 
     @staticmethod
     def get_data(url, params=None, headers=None):
@@ -39,14 +40,7 @@ class ApiHelper:
         response = requests.post(url, data=data, headers=headers)
         return response.json()
 
-
-class ApiClient:
-    """ API 客户端类 """
-
-    def __init__(self, _base_url):
-        self.base_url = _base_url
-
-    def login(self, username, password, registration_id=""):
+    def get_token(self, username, password, registration_id=""):
         url = f"{self.base_url}/login"
         payload = json.dumps({
             "username": username,
@@ -55,20 +49,19 @@ class ApiClient:
         })
         headers = {
             'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
         }
-        response = requests.post(url, headers=headers, data=payload)
-        return response.json()
+        _token = self.post_data(url=url, headers=headers, data=payload).get("token", [])
+        return _token
 
     def get_dept_data(self, _token) -> list[str]:
         """获取部门数据"""
         url = f"{self.base_url}/system/dept/option/tree"
         headers = {
-            'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
-            'Authorization': f'Bearer {_token}'
+            'Authorization': f'Bearer {_token}',
+            'User-Agent': 'Apifox/1.0.0 (https://apifox.com)'
         }
-        response = requests.get(url, headers=headers)
-        data = response.json().get("data", [])
+        data = self.get_data(url=url, headers=headers).get("data", [])
         return self.extract_labels(data)
 
     @staticmethod
@@ -77,22 +70,27 @@ class ApiClient:
         for item in data:
             labels.append(item.get("label"))
             if "children" in item:
-                labels.extend(ApiClient.extract_labels(item["children"]))
+                labels.extend(ApiData.extract_labels(item["children"]))
         return labels
+
+    def get_type_data(self, _token) -> list[str]:
+        """特殊作业类型"""
+        url = f"{self.base_url}/system/dict/data/type/special_task_ticket_type"
+        headers = {
+            'Authorization': f'Bearer {_token}',
+            'User-Agent': 'Apifox/1.0.0 (https://apifox.com)'
+        }
+        data = self.get_data(url=url, headers=headers).get("data", [])
+        return data
 
 
 # Example usage
 if __name__ == "__main__":
-    base_url = "http://113.194.201.66:8899"
-    api_client = ApiClient(base_url)
+    api_data = ApiData("http://113.194.201.66:8899")
+    token = api_data.get_token("admin", "yl123456")
 
-    # Login
-    login_response = api_client.login("123456789", "123456")
-    print(login_response)
-
-    # Get special ticket ID
-    token = login_response.get("token")
     # Get department data
     if token:
-        dept_data = api_client.get_dept_data(token)
-        print(dept_data)
+        dept_list = api_data.get_dept_data(token)
+        type_list = api_data.get_type_data(token)
+        print(type_list)

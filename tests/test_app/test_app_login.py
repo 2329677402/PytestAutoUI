@@ -21,8 +21,6 @@ class TestAppLogin(BaseCaseApp):
     @allure.severity(allure.severity_level.BLOCKER)
     @allure.title("登录成功(账号存在+密码正确)")
     @pytest.mark.smoke
-    @pytest.mark.app
-    @pytest.mark.login
     @pytest.mark.run(order=1)
     def test_app_login_success(self):
         """ Success login test case. """
@@ -36,8 +34,6 @@ class TestAppLogin(BaseCaseApp):
 
     @allure.severity(allure.severity_level.NORMAL)
     @allure.title("登录失败(账号存在+密码错误)")
-    @pytest.mark.app
-    @pytest.mark.login
     def test_app_login_fail(self):
         """ Failed login test case. """
         try:

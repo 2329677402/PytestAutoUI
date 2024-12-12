@@ -117,27 +117,35 @@ class BaseCase:
         :Usage:
             self.take_screenshot("screenshot_name")
         """
+        # if isinstance(self.driver, WebDriver):
         try:
+            # Ensure the directory exists.
+            screenshots_dir = self.screenshots_path
+            os.makedirs(screenshots_dir, exist_ok=True)
+
             # Wait for the page to load.
             # document.readyState: A property indicating the loading state of the document. It has the following possible values:
             # "loading": Document still loading.
             # "interactive": The document has finished loading, the document has been parsed, but Sub-resources such as images, stylesheets, and frames are still loading.
             # "complete": The document and all Sub-resources are fully loaded.
-            self._wait.until(lambda driver: driver.execute_script("return document.readyState") == "complete")
-
-            # Ensure the directory exists.
-            screenshots_dir = self.screenshots_path
-            os.makedirs(screenshots_dir, exist_ok=True)
+            # noinspection PyBroadException
+            try:
+                self._wait.until(lambda driver: driver.execute_script("return document.readyState") == "complete")
+            except:
+                # Tips: Native_app does not support this wait object!
+                pass
 
             # Generate file name.
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             filename = f"{name}_{timestamp}.png" if name else f"screenshot_{timestamp}.png"
 
-            # Use absolute paths.
-            filepath = os.path.join(screenshots_dir, filename)
+            # Save screenshot file using filename.
+            self.driver.save_screenshot(filename)
 
-            # Save screenshot file.
-            self.driver.save_screenshot(filepath)
+            # Move the file to the specified directory.
+            filepath = os.path.join(screenshots_dir, filename)
+            shutil.move(filename, screenshots_dir)
+
             INFO.logger.info(f"Save screenshots to: {filepath}.")
             return filepath
         except Exception as e:
@@ -168,18 +176,21 @@ class BaseCase:
             self.take_screenshot("open_url_unknown_exception")
             raise
 
-    def click(self, selector: str = None, by: str = 'css_selector', delay: int = 0,
+    def click(self, selector: str = None, by: str = 'css_selector', delay: float = 0,
               pos: Tuple[int, int] = None) -> None:
         """
-        Click the specified element or position.
+        Click the specified element or position. (Only web)
 
         :param selector: Element selector.
         :param by: Locator method.
         :param delay: Delay time before clicking.
         :param pos: Click position.
         :Usage:
-            self.click("#submit_button")
-            self.click(pos=(100, 200))
+            Web:
+                self.click("#submit_button")
+                self.click(pos=(100, 200))
+            App:
+                self.find_element("#submit_button").click()
         """
         if pos:
             try:

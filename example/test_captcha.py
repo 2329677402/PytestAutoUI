@@ -24,6 +24,7 @@ class TestExample(BaseCaseWeb):
         """测试文本验证码"""
         # 打开验证码页面
         self.open("https://captcha.ruijie.com.cn/")
+        self.take_screenshot("测试")
         img_el = self.find_element("img")
         img_el.screenshot()
         self.sleep(3)
