@@ -30,4 +30,3 @@ class TestWebLogin(BaseCaseWeb):
             ERROR.logger.error(f"Failed to test the Web login function, error message: {str(e)}")
             self.take_screenshot("login_failed")
             raise
-        self.driver.switch_to.alert.accept()

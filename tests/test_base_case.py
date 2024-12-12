@@ -28,7 +28,7 @@ class BaseCaseWeb(BaseCase):
         self.setup_actions()
         yield
 
-    def login(self, url="http://113.194.201.66:8092/login", username="admin", password="admin123"):
+    def login(self, url="http://113.194.201.66:8092/login", username="admin", password="yl123456"):
         """ Web login implementation. """
         PageWebLogin.web_login(self, url, username, password)
 

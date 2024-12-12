@@ -101,7 +101,7 @@ class SelectorUtil:
 
         # Check if the locator is valid.
         if not cls.is_valid_by(by):
-            raise ValueError(f"不支持的定位方式: {by}")
+            raise ValueError(f"Not supported locator type: '{by}'.")
 
         # Handle XPath selector.
         if cls.is_xpath_selector(selector):
