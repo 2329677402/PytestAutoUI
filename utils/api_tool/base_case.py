@@ -179,93 +179,45 @@ class BaseCase:
     def click(self, selector: str = None, by: str = 'css_selector', delay: float = 0,
               pos: Tuple[int, int] = None) -> None:
         """
-        Click the specified element or position. (Only web)
+        Click the specified element or position.
 
         :param selector: Element selector.
         :param by: Locator method.
         :param delay: Delay time before clicking.
-        :param pos: Click position.
+        :param pos: Click position. (Only web and webview-app, for native-app, please use 'tap' method)
         :Usage:
-            Web:
+            for web and webview-app:
                 self.click("#submit_button")
                 self.click(pos=(100, 200))
-            App:
-                self.find_element("#submit_button").click()
+
+            for native-app:
+                self.tap(pos=[(100, 200)])
         """
         if pos:
             try:
                 if delay > 0:
                     time.sleep(delay)  # Wait only if explicitly requested.
 
-                # Use JavaScript to click to specify the position.
+                # Click specific position.
                 self.driver.execute_script(f"window.scrollTo({pos[0]}, {pos[1]});")
                 self.driver.execute_script(f"document.elementFromPoint({pos[0]}, {pos[1]}).click();")
-                INFO.logger.info(f"Successfully clicked position: {pos}.")
+                INFO.logger.info(f"Clicked position: {pos}.")
             except Exception as e:
                 ERROR.logger.error(f"Failed to click position: {pos}, error message: {str(e)}")
                 self.take_screenshot("click_pos_error")
                 raise
         else:
-            max_attempts = 3  # Maximum number of retries.
-            attempt = 0
-            last_exception = None
-
-            while attempt < max_attempts:
-                try:
-                    # Wait for the page to load.
-                    script = (
-                        "return (typeof jQuery !== 'undefined') ? "
-                        "jQuery.active == 0 : true"
-                    )
-                    self.driver.execute_script(script)
-
-                    locator = SelectorUtil.get_selenium_locator(selector, by)
-
-                    # Wait for the element to appear.
-                    self._wait.until(EC.presence_of_element_located(locator))
-                    self._wait.until(EC.visibility_of_element_located(locator))
-                    element = self._wait.until(EC.element_to_be_clickable(locator))
-
-                    # Scroll to the element.
-                    self.driver.execute_script(
-                        "arguments[0].scrollIntoView(true);",
-                        element
-                    )
-
-                    if delay > 0:
-                        time.sleep(delay)  # Wait only if explicitly requested.
-
-                    # Click the element.
-                    try:
-                        element.click()
-                    except ElementClickInterceptedException:
-                        # If the element attribute is blocked, use JavaScript to click.
-                        self.driver.execute_script("arguments[0].click();", element)
-
-                    INFO.logger.info(f"Successfully clicked element: {selector} (by={by}).")
-                    return
-
-                except TimeoutException as e:
-                    last_exception = e
-                    attempt += 1
-                    continue
-                except Exception as e:
-                    last_exception = e
-                    attempt += 1
-                    continue
-
-            # If the maximum number of retries is reached, an exception is thrown.
-            ERROR.logger.error(f"Failed to click element: {selector} (by={by}), error message: {str(last_exception)}")
-            self.take_screenshot("click_error")
-
-            # Output the page source code.
             try:
-                page_source = self.driver.page_source
-                ERROR.logger.error(f"Page source code: {page_source}")
-            except Exception as e:
-                ERROR.logger.error(f"Failed to get page source code: {str(e)}")
+                if delay > 0:
+                    time.sleep(delay)  # Wait only if explicitly requested.
 
-            raise last_exception
+                # Click specific element.
+                self.find_element(selector, by).click()
+                INFO.logger.info(f"Clicked element: {selector} (by={by}).")
+            except Exception as e:
+                ERROR.logger.error(f"Failed to click element: {selector} (by={by}), error message: {str(e)}")
+                self.take_screenshot("click_element_error")
+                raise
 
     def type(self, selector: str, text: str, by: str = 'css_selector', timeout: int = None,
              retry: bool = False) -> None:
@@ -284,7 +236,7 @@ class BaseCase:
             element = self.find_element(selector, by, timeout)
             element.clear()
             element.send_keys(text)
-            INFO.logger.info(f"Successfully entered text: <{text}> into the element: {selector} (by={by}).")
+            INFO.logger.info(f"Entered text: <{text}> into the element: {selector} (by={by}).")
         except TimeoutException:
             ERROR.logger.error(f"Timeout when entering text: <{text}> into the element: {selector} (by={by}).")
             self.take_screenshot("type_timeout")
@@ -794,7 +746,7 @@ class BaseCase:
                 EC.presence_of_element_located(locator)
             )
             if not suppress_logging:
-                INFO.logger.info(f"Successfully found the element: {selector} (by={by}).")
+                INFO.logger.info(f"Found the element: {selector} (by={by}).")
             return CustomWebElement(self.driver, element.id)
         except TimeoutException:
             if not suppress_logging:
@@ -1237,7 +1189,7 @@ class BaseCase:
             self.take_screenshot("current_page_code_error")
             raise
 
-    def tap(self, pos: List[Tuple[int, int]], duration: Optional[int] = None) -> Self:
+    def tap(self, pos: List[Tuple[int or float, int or float]], duration: Optional[int] = None) -> Self:
         """
         Function: Simulates a click operation at the specified coordinates. (App only)
         Scenario: Applicable to scenarios where multiple click operations need to be simulated at different screen locations.

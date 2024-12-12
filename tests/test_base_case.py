@@ -47,7 +47,7 @@ class BaseCaseApp(BaseCase):
         self.setup_actions()
         yield
 
-    def login(self, username="admin", password="admin123"):
+    def login(self, username="admin", password="yl123456"):
         """ App login implementation. """
         PageAppLogin.app_login(self, username, password)
 
