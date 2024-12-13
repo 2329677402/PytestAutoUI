@@ -11,7 +11,11 @@ import os
 import time
 import shutil
 import requests
+from PIL import Image
 from datetime import datetime
+
+from pytesseract import pytesseract
+
 from common.setting import Settings
 from utils.api_tool.custom_webelement import CustomWebElement
 from utils.log_tool.log_control import INFO, ERROR
@@ -1576,3 +1580,35 @@ class BaseCase:
             ERROR.logger.error(f"Failed to assert toast message: {msg}, error message: {str(e)}")
             self.take_screenshot("get_toast_message_error")
             raise
+
+    def get_toast_message_by_ocr(self) -> str | None:
+        """
+        Get the toast message using OCR from a cropped screenshot.
+        """
+        try:
+            # Step 1: Take a full-screen screenshot
+            screenshot_path = self.take_screenshot("toast_screenshot")
+            image = Image.open(screenshot_path)
+
+            # Step 2: Define cropping area (adjust these coordinates as per your screen resolution)
+            screen_width, screen_height = image.size
+            # Assuming the toast is in the center-bottom area
+            left = screen_width * 0.2  # 20% from the left
+            right = screen_width * 0.8  # 20% from the right
+            top = screen_height * 0.6  # Start 60% from the top
+            bottom = screen_height * 0.8  # End 80% from the top
+
+            cropped_image = image.crop((left, top, right, bottom))
+
+            # Step 3: Save cropped image (optional, for debugging purposes)
+            cropped_image_path = "./screenshots/toast_cropped.png"
+            cropped_image.save(cropped_image_path)
+
+            # Step 4: Perform OCR on the cropped image
+            toast_message = pytesseract.image_to_string(cropped_image, lang='chi_sim')
+            toast_message = toast_message.strip()
+            INFO.logger.info(f"Got the toast message using OCR: {toast_message}")
+            return toast_message
+        except Exception as e:
+            ERROR.logger.error(f"Failed to get toast message by OCR. Error: {str(e)}")
+            return None

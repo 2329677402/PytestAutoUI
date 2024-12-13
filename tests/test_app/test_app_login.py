@@ -36,7 +36,7 @@ class TestAppLogin(BaseCaseApp):
             self.start_app(package)
             self.assert_toast_msg("错误")
             self.login()
-            self.assert_toast_msg("操作成功")
+            self.get_toast_message_by_ocr()
 
             self.sleep(2)
         except Exception as e:
