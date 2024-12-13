@@ -31,7 +31,7 @@ class TestAppSpecial(BaseCaseApp):
 
             # 特殊作业
             special_task = '//*[@text="特殊作业"]'
-            self.click(special_task)
+            self.click(special_task, 'xpath')
 
             # 作业票预约
             ticket_reservation = '(//*[@text="作业票预约"])[2]'
@@ -66,7 +66,7 @@ class TestAppSpecial(BaseCaseApp):
             self.tap([(width * 0.5, height * 0.43)])
             self.sleep(1)
             print(self.contexts)
-            input_task_location = '//android.webkit.WebView[@text="pages/working/appointment/addForm[3]"]/android.view.View/android.view.View/android.view.View[5]/android.view.View/android.view.View[1]/android.view.View/android.view.View/android.view.View/android.view.View/android.view.View/android.widget.EditText'
+            input_task_location = '//*[@text="pages/working/appointment/addForm[3]"]/android.view.View/android.view.View/android.view.View[5]/android.view.View/android.view.View[1]/android.view.View/android.view.View/android.view.View/android.view.View/android.view.View/android.widget.EditText'
             el = self.find_element(input_task_location)
             print(el)
             el.send_keys('临时停车区2')

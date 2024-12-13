@@ -8,6 +8,7 @@
 """
 import base64
 import os
+import subprocess
 import time
 import shutil
 import requests
@@ -31,10 +32,12 @@ class BaseCase:
     _settings: ClassVar[Settings] = Settings()
     _wait: Optional[WebDriverWait] = None
     _timeout: int = _settings.global_config['webdriver_timeout']
+    _implicit_timeout: int = _settings.global_config['implicit_timeout']
     _poll_frequency: float = _settings.global_config['webdriver_poll_frequency']
     screenshots_path = _settings.global_config['screenshots_dir']
     downloads_path = _settings.global_config['downloads_dir']
     logs_path = _settings.global_config['logs_dir']
+    apps_path = _settings.global_config['apps_dir']
 
     def setup_actions(self):
         """ Initialize the test environment. """
@@ -55,6 +58,8 @@ class BaseCase:
             self._clean_downloads()
         if self._settings.global_config.get('clean_logs', True):
             self._clean_logs()
+        if self._settings.global_config.get('clean_apps', True):
+            self._clean_apps()
 
     def _clean_screenshots(self):
         """ Clean up the screenshot file. """
@@ -106,6 +111,16 @@ class BaseCase:
                 INFO.logger.info("Log files cleanup completed.")
             except Exception as e:
                 ERROR.logger.error(f"Error occurred while cleaning log directory: {str(e)}")
+
+    def _clean_apps(self):
+        """ Clean up the app file. """
+        if not os.path.exists(self.apps_path):
+            os.makedirs(self.apps_path, exist_ok=True)
+            INFO.logger.info(f"App directory created: {self.apps_path}")
+        else:
+            shutil.rmtree(self.apps_path)
+            os.makedirs(self.apps_path, exist_ok=True)
+            INFO.logger.info("App files cleanup completed.")
 
     def take_screenshot(self, name: str) -> Union[str, None]:
         """
@@ -161,7 +176,7 @@ class BaseCase:
         """
         try:
             self.driver.get(url)
-            INFO.logger.info(f"Successfully opened URL: {url}.")
+            INFO.logger.info(f"Opened URL: {url}.")
         except TimeoutException:
             ERROR.logger.error(f"Timeout when opening URL: {url}.")
             self.take_screenshot("open_url_timeout")
@@ -175,8 +190,88 @@ class BaseCase:
             self.take_screenshot("open_url_unknown_exception")
             raise
 
-    def click(self, element: str = None, by: str = 'css_selector', delay: float = 0,
-              pos: Tuple[int, int] = None) -> None:
+    def find_element(self, element: str or WebElement, by: str = 'css_selector', timeout: Optional[int] = None,
+                     suppress_logging: bool = False) -> CustomWebElement:
+        """
+        Find a single element.
+
+        :param element: Element selector.
+        :param by: Locator method.
+        :param timeout: Timeout.
+        :param suppress_logging: Suppress logging if True.
+        :return: WebElement object.
+        :Usage:
+            element = self.find_element("#element_id")
+        """
+        temp_wait = self._wait if timeout is None else WebDriverWait(
+            self.driver,
+            timeout,
+            poll_frequency=self._poll_frequency
+        )
+
+        try:
+            locator = SelectorUtil.get_selenium_locator(element, by)
+            element = temp_wait.until(
+                EC.presence_of_element_located(locator)
+            )
+            if not suppress_logging:
+                INFO.logger.info(f"Found the element: {element} (by={by}).")
+            return CustomWebElement(self.driver, element.id)
+        except TimeoutException:
+            if not suppress_logging:
+                ERROR.logger.error(f"Timeout when finding the element: {element} (by={by}).")
+                self.take_screenshot("find_element_timeout")
+            raise
+        except Exception as e:
+            if not suppress_logging:
+                ERROR.logger.error(f"Failed to find the element: {element} (by={by}), error message: {str(e)}")
+                self.take_screenshot("find_element_error")
+            raise
+
+    def find_elements(self, element: str or WebElement, by: str = 'css_selector', timeout: Optional[int] = None,
+                      suppress_logging: bool = False) -> List[WebElement]:
+        """
+        Find multiple elements.
+
+        :param element: Element selector.
+        :param by: Locator method.
+        :param timeout: Timeout.
+        :param suppress_logging: Suppress logging if True.
+        :return: List of WebElement objects.
+        :Usage:
+            elements = self.find_elements(".element_class")
+        """
+        temp_wait = self._wait if timeout is None else WebDriverWait(
+            self.driver,
+            timeout,
+            poll_frequency=self._poll_frequency
+        )
+
+        try:
+            locator = SelectorUtil.get_selenium_locator(element, by)
+            elements = temp_wait.until(
+                EC.presence_of_all_elements_located(locator)
+            )
+            if not suppress_logging:
+                INFO.logger.info(f"Successfully found the elements: {element} (by={by}).")
+            return elements
+        except TimeoutException:
+            if not suppress_logging:
+                ERROR.logger.error(f"Timeout when finding the elements: {element} (by={by}).")
+                self.take_screenshot("find_elements_timeout")
+            raise
+        except Exception as e:
+            if not suppress_logging:
+                ERROR.logger.error(f"Failed to find the elements: {element} (by={by}), error message: {str(e)}")
+                self.take_screenshot("find_elements_error")
+            raise
+
+    def click(self,
+              element: str or WebElement = None,
+              by: str = 'css_selector',
+              delay: int or float = 0,
+              pos: Tuple[int or float, int or float] = None,
+              ) -> None:
         """
         Click the specified element or position.
 
@@ -211,7 +306,7 @@ class BaseCase:
                     time.sleep(delay)  # Wait only if explicitly requested.
 
                 # Click specific element.
-                self.find_element(element, by).click()
+                self.find_element(element, by, suppress_logging=True).click()
                 INFO.logger.info(f"Clicked element: {element} (by={by}).")
             except Exception as e:
                 ERROR.logger.error(f"Failed to click element: {element} (by={by}), error message: {str(e)}")
@@ -232,7 +327,7 @@ class BaseCase:
             self.type("#input_field", "example text"，timeout=10，retry=True)
         """
         try:
-            element = self.find_element(element, by, timeout)
+            element = self.find_element(element, by, timeout, suppress_logging=True)
             element.clear()
             element.send_keys(text)
             INFO.logger.info(f"Entered text: <{text}> into the element: {element} (by={by}).")
@@ -396,7 +491,7 @@ class BaseCase:
             is_visible = self.is_exact_link_text_visible("example link text")
         """
         try:
-            element = self.find_element(f'a:contains("{link_text}")', by='css_selector', suppress_logging=True)
+            element = self.find_element(f'a:contains("{link_text}")', by='xpath', suppress_logging=True)
             return element.text == link_text
         except (NoSuchElementException, TimeoutException):
             return False
@@ -413,8 +508,9 @@ class BaseCase:
         :Usage:
             is_visible = self.is_partial_link_text_visible("example link text")
         """
+        self.implicit_wait()
         try:
-            element = self.find_element(f'a:contains("{link_text}")', by='css_selector', suppress_logging=True)
+            element = self.find_element(f'a:contains("{link_text}")', by='xpath', suppress_logging=True)
             return link_text in element.text
         except (NoSuchElementException, TimeoutException):
             return False
@@ -430,6 +526,7 @@ class BaseCase:
         :Usage:
             self.assert_title("Expected Title")
         """
+        self.implicit_wait()
         try:
             actual_title = self.current_page_title
             assert actual_title == title, f"Title mismatch: Expected '{title}', but got '{actual_title}'."
@@ -456,6 +553,7 @@ class BaseCase:
         :Usage:
             self.assert_element("#element_id")
         """
+        self.implicit_wait()
         try:
             element = self.find_element(element, by, suppress_logging=True)
 
@@ -482,7 +580,7 @@ class BaseCase:
             raise
 
     @staticmethod
-    def sleep(seconds: float = 0.1) -> None:
+    def sleep(seconds: float or int) -> None:
         """
         Pause for a specified number of seconds.
 
@@ -492,6 +590,23 @@ class BaseCase:
         """
         time.sleep(seconds)
 
+    def implicit_wait(self, seconds: float or int = 0) -> None:
+        """
+        Set the implicit wait time for the driver.
+
+        :param seconds: Implicit wait time(seconds).
+        :Usage:
+            self.implicit_wait(2)
+        """
+        try:
+            if seconds == 0:
+                seconds = self._implicit_timeout
+
+            self.driver.implicitly_wait(seconds)
+        except Exception as e:
+            ERROR.logger.error(f"An unexpected error occurred: {str(e)}")
+            raise
+
     def start_app(self, app_package: str) -> None:
         """
         Start the App.
@@ -500,12 +615,13 @@ class BaseCase:
         :Usage:
             self.start_app("com.example.app")
         """
+        self.implicit_wait()
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.activate_app(app_package)
-                INFO.logger.info(f"Successfully started the App: {app_package}.")
+                INFO.logger.info(f"Started the App: {app_package}.")
             else:
-                raise NotImplementedError("The Web end does not support the 'start_app' method!")
+                raise NotImplementedError("Not supported 'start_app' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(f"Failed to start the App: {app_package}, error message: {str(e)}")
             raise
@@ -518,12 +634,13 @@ class BaseCase:
         :Usage:
             self.close_app("com.example.app")
         """
+        self.implicit_wait()
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.terminate_app(app_package)
-                INFO.logger.info(f"Successfully closed the App: {app_package}.")
+                INFO.logger.info(f"Closed the App: {app_package}.")
             else:
-                raise NotImplementedError("The Web end does not support the 'close_app' method!")
+                raise NotImplementedError("Not supported 'close_app' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(f"Failed to close the App: {app_package}, error message: {str(e)}")
             raise
@@ -537,9 +654,14 @@ class BaseCase:
         :Usage:
             print(self.current_package)
         """
-        if isinstance(self.driver, AppDriver):
-            return self.driver.current_package
-        raise NotImplementedError("The Web end does not support the 'current_package' method!")
+        try:
+            if isinstance(self.driver, AppDriver):
+                return self.driver.current_package
+            else:
+                raise NotImplementedError("Not supported 'current_package' method in Web!")
+        except Exception as e:
+            ERROR.logger.error(f"Failed to get the current App package name, error message: {str(e)}")
+            raise
 
     @property
     def current_activity(self) -> str:
@@ -550,26 +672,42 @@ class BaseCase:
         :Usage:
             print(self.current_activity)
         """
-        if isinstance(self.driver, AppDriver):
-            return self.driver.current_activity
-        raise NotImplementedError("The Web end does not support the 'current_activity' method!")
+        try:
+            if isinstance(self.driver, AppDriver):
+                return self.driver.current_activity
+            else:
+                raise NotImplementedError("Not supported 'current_activity' method on the Web end.")
+        except Exception as e:
+            ERROR.logger.error(f"Failed to get the current App activity name, error message: {str(e)}")
+            raise
 
-    def install_app(self, app_path: str) -> None:
+    def install_app(self, app_name: str) -> None:
         """
         Install the App.
 
-        :param app_path: Apk file path.
+        :param app_name: Apk file name.
         :Usage:
-            self.install_app("/path/to/app.apk")
+            app_path = self.install_app("app.apk")
         """
+        self.implicit_wait()
+        app_path = os.path.join(self.apps_path, app_name)
+
+        if not os.path.exists(app_path):
+            ERROR.logger.error(f"App not found: {app_name}, please check {self.apps_path} directory.")
+            raise FileNotFoundError(f"App not found: {app_name}.")
+
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.install_app(app_path)
-                INFO.logger.info(f"Successfully installed the App: {app_path}.")
+                INFO.logger.info(f"Installed the App: {app_name}.")
             else:
-                raise NotImplementedError("The Web end does not support the 'install_app' method!")
+                raise NotImplementedError("Not supported 'install_app' method in Web!")
+
         except WebDriverException as e:
-            ERROR.logger.error(f"Failed to install the App: {app_path}, error message: {str(e)}")
+            ERROR.logger.error(f"Failed to install the App: {app_name}, error message: {str(e)}")
+            raise
+        except Exception as e:
+            ERROR.logger.error(f"Error during app installation or path retrieval: {str(e)}")
             raise
 
     def uninstall_app(self, app_package: str) -> None:
@@ -578,14 +716,16 @@ class BaseCase:
 
         :param app_package: App package name.
         :Usage:
-            self.uninstall_app("com.example.app")
+            app_package = self.current_package
+            self.uninstall_app(app_package)
         """
+        self.implicit_wait()
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.remove_app(app_package)
-                INFO.logger.info(f"Successfully uninstalled the App: {app_package}.")
+                INFO.logger.info(f"Uninstalled the App: {app_package}.")
             else:
-                raise NotImplementedError("The Web end does not support the 'uninstall_app' method!")
+                raise NotImplementedError("Not supported 'uninstall_app' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(f"Failed to uninstall the App: {app_package}, error message: {str(e)}")
             raise
@@ -599,10 +739,11 @@ class BaseCase:
         :Usage:
             is_installed = self.is_app_installed("com.example.app")
         """
+        self.implicit_wait()
         try:
             if isinstance(self.driver, AppDriver):
                 return self.driver.is_app_installed(app_package)
-            raise NotImplementedError("The Web end does not support the 'is_app_installed' method!")
+            raise NotImplementedError("Not supported 'is_app_installed' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(f"Failed to check if the App is installed: {app_package}, error message: {str(e)}")
             raise
@@ -615,12 +756,13 @@ class BaseCase:
         :Usage:
             self.background_app(5)
         """
+        self.implicit_wait()
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.background_app(seconds)
-                INFO.logger.info(f"Successfully put the App in the background for {seconds} seconds.")
+                INFO.logger.info(f"Background the App for {seconds} seconds.")
             else:
-                raise NotImplementedError("The Web end does not support the 'background_app' method!")
+                raise NotImplementedError("Not supported 'background_app' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(
                 f"Failed to put the App in the background for {seconds} seconds, error message: {str(e)}")
@@ -649,9 +791,17 @@ class BaseCase:
         | 6 (All network on) | 1    | 1    | 0             |
         +--------------------+------+------+---------------+
         """
-        if isinstance(self.driver, AppDriver):
-            return self.driver.network_connection
-        raise NotImplementedError("The Web end does not support the 'get_network_connect' method!")
+        network_dict = {0: 'None', 1: 'Airplane Mode', 2: 'Wi-fi only', 4: 'Data only', 6: 'All network on'}
+
+        try:
+            if isinstance(self.driver, AppDriver):
+                network_type = self.driver.network_connection
+                INFO.logger.info(f"Network connection type of current Mobile: {network_dict[network_type]}.")
+                return network_type
+            raise NotImplementedError("Not supported 'get_network_connect' method in Web!")
+        except WebDriverException as e:
+            ERROR.logger.error(f"Failed to get the network connection type, error message: {str(e)}")
+            raise
 
     def set_network_connect(self, connect_type: int) -> None:
         """
@@ -661,12 +811,14 @@ class BaseCase:
         :Usage:
             self.set_network_connect(2)
         """
+        network_dict = {0: 'None', 1: 'Airplane Mode', 2: 'Wi-fi only', 4: 'Data only', 6: 'All network on'}
+
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.set_network_connection(connect_type)
-                INFO.logger.info(f"Successfully set the network connection type: {connect_type}.")
+                INFO.logger.info(f"Set the network connection type to: {network_dict[connect_type]}.")
             else:
-                raise NotImplementedError("The Web end does not support the 'set_network_connect' method!")
+                raise NotImplementedError("Not supported 'set_network_connect' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(f"Failed to set the network connection type: {connect_type}, error message: {str(e)}")
             raise
@@ -720,13 +872,13 @@ class BaseCase:
                     self.driver.press_keycode(keycode, metastate)
                 else:
                     self.driver.press_keycode(keycode)
-                INFO.logger.info(f"Successfully sent the keycode: {keycode}.")
+                INFO.logger.info(f"Send the keycode: {keycode}.")
+                return self
             else:
-                raise NotImplementedError("The Web end does not support the 'press_keycode' method!")
+                raise NotImplementedError("Not supported 'press_keycode' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(f"Failed to send the keycode: {keycode}, error message: {str(e)}")
             raise
-        return self
 
     def open_notify(self) -> Self:
         """
@@ -735,16 +887,17 @@ class BaseCase:
         :Usage:
             self.open_notify()
         """
+        self.implicit_wait()
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.open_notifications()
-                INFO.logger.info("Successfully opened the notification shade.")
+                INFO.logger.info("Open the notification shade.")
+                return self
             else:
-                raise NotImplementedError("The Web end does not support the 'open_notify' method!")
+                raise NotImplementedError("Not supported 'open_notify' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(f"Failed to open the notification shade, error message: {str(e)}")
             raise
-        return self
 
     @property
     def contexts(self) -> List[str]:
@@ -756,9 +909,16 @@ class BaseCase:
             contexts = self.contexts
             print(contexts)
         """
-        if isinstance(self.driver, AppDriver):
-            return self.driver.contexts
-        raise NotImplementedError("The Web end does not support the 'contexts' method!")
+        try:
+            if isinstance(self.driver, AppDriver):
+                contexts = self.driver.contexts
+                INFO.logger.info(f"Contexts list: {contexts}.")
+                return contexts
+            else:
+                raise NotImplementedError("Not supported 'contexts' method in Web!")
+        except Exception as e:
+            ERROR.logger.error(f"Failed to get the contexts, error message: {str(e)}")
+            raise
 
     def switch_to_context(self, context_name: str) -> Self:
         """
@@ -771,101 +931,13 @@ class BaseCase:
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.switch_to.context(context_name)
-                INFO.logger.info(f"Successfully switched to the context: {context_name}.")
+                INFO.logger.info(f"Switched to the context: {context_name}.")
+                return self
             else:
-                raise NotImplementedError("The Web end does not support the 'switch_to_context' method!")
+                raise NotImplementedError("Not supported 'switch_to_context' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(f"Failed to switch to the context: {context_name}, error message: {str(e)}")
             raise
-        return self
-
-    def find_element(self, element: str, by: str = 'css_selector', timeout: Optional[int] = None,
-                     suppress_logging: bool = False) -> CustomWebElement:
-        """
-        Find a single element.
-
-        :param element: Element selector.
-        :param by: Locator method.
-        :param timeout: Timeout.
-        :param suppress_logging: Suppress logging if True.
-        :return: WebElement object.
-        :Usage:
-            element = self.find_element("#element_id")
-        """
-        temp_wait = self._wait if timeout is None else WebDriverWait(
-            self.driver,
-            timeout,
-            poll_frequency=self._poll_frequency
-        )
-
-        try:
-            locator = SelectorUtil.get_selenium_locator(element, by)
-            element = temp_wait.until(
-                EC.presence_of_element_located(locator)
-            )
-            if not suppress_logging:
-                INFO.logger.info(f"Found the element: {element} (by={by}).")
-            return CustomWebElement(self.driver, element.id)
-        except TimeoutException:
-            if not suppress_logging:
-                ERROR.logger.error(f"Timeout when finding the element: {element} (by={by}).")
-                self.take_screenshot("find_element_timeout")
-            raise
-        except Exception as e:
-            if not suppress_logging:
-                ERROR.logger.error(f"Failed to find the element: {element} (by={by}), error message: {str(e)}")
-                self.take_screenshot("find_element_error")
-            raise
-
-    def find_elements(self, element: str, by: str = 'css_selector', timeout: Optional[int] = None,
-                      suppress_logging: bool = False) -> List[WebElement]:
-        """
-        Find multiple elements.
-
-        :param element: Element selector.
-        :param by: Locator method.
-        :param timeout: Timeout.
-        :param suppress_logging: Suppress logging if True.
-        :return: List of WebElement objects.
-        :Usage:
-            elements = self.find_elements(".element_class")
-        """
-        temp_wait = self._wait if timeout is None else WebDriverWait(
-            self.driver,
-            timeout,
-            poll_frequency=self._poll_frequency
-        )
-
-        try:
-            locator = SelectorUtil.get_selenium_locator(element, by)
-            elements = temp_wait.until(
-                EC.presence_of_all_elements_located(locator)
-            )
-            if not suppress_logging:
-                INFO.logger.info(f"Successfully found the elements: {element} (by={by}).")
-            return elements
-        except TimeoutException:
-            if not suppress_logging:
-                ERROR.logger.error(f"Timeout when finding the elements: {element} (by={by}).")
-                self.take_screenshot("find_elements_timeout")
-            raise
-        except Exception as e:
-            if not suppress_logging:
-                ERROR.logger.error(f"Failed to find the elements: {element} (by={by}), error message: {str(e)}")
-                self.take_screenshot("find_elements_error")
-            raise
-
-    def send_keys(self, element: str, text: str, by: str = 'css_selector') -> None:
-        """
-        Enter text into the specified element.
-
-        :param element: Element selector.
-        :param text: Text to enter.
-        :param by: Locator method.
-        :Usage:
-            self.send_keys("#input_field", "example text")
-        """
-        pass
 
     def download_image(self, element: WebElement, save_name: str, save_path: Optional[str] = None) -> Union[str, None]:
         """
@@ -1009,6 +1081,7 @@ class BaseCase:
         :Usage:
             self.close()
         """
+        self.implicit_wait()
         try:
             self.driver.close()
             INFO.logger.info("Successfully closed the current window.")
@@ -1024,9 +1097,10 @@ class BaseCase:
         :Usage:
             self.quit()
         """
+        self.implicit_wait()
         try:
             self.driver.quit()
-            INFO.logger.info("Successfully exited the browser.")
+            INFO.logger.info("Exit the browser successfully.")
         except Exception as e:
             ERROR.logger.error(f"Failed to exit the browser: {str(e)}")
             self.take_screenshot("quit_error")
@@ -1039,9 +1113,10 @@ class BaseCase:
         :Usage:
             self.maximize_window()
         """
+        self.implicit_wait()
         try:
             self.driver.maximize_window()
-            INFO.logger.info("Successfully maximized the window.")
+            INFO.logger.info("Maximized the window.")
         except Exception as e:
             ERROR.logger.error(f"Failed to maximize the window: {str(e)}")
             self.take_screenshot("maximize_window_error")
@@ -1054,9 +1129,10 @@ class BaseCase:
         :Usage:
             self.minimize_window()
         """
+        self.implicit_wait()
         try:
             self.driver.minimize_window()
-            INFO.logger.info("Successfully minimized the window.")
+            INFO.logger.info("Minimized the window.")
         except Exception as e:
             ERROR.logger.error(f"Failed to minimize the window: {str(e)}")
             self.take_screenshot("minimize_window_error")
@@ -1072,9 +1148,10 @@ class BaseCase:
             self.switch_to_frame(0)
             self.switch_to_frame(self.find_element("iframe"))
         """
+        self.implicit_wait()
         try:
             self.driver.switch_to.frame(frame)
-            INFO.logger.info(f"Successfully switched to the frame: {frame}.")
+            INFO.logger.info(f"Switched to the frame: {frame}.")
         except Exception as e:
             ERROR.logger.error(f"Failed to switch to the frame: {frame}, error message: {str(e)}")
             self.take_screenshot("switch_to_frame_error")
@@ -1087,9 +1164,10 @@ class BaseCase:
         :Usage:
             self.switch_to_default_frame()
         """
+        self.implicit_wait()
         try:
             self.driver.switch_to.default_content()
-            INFO.logger.info("Successfully switched to the default frame.")
+            INFO.logger.info("Switched to the default frame.")
         except Exception as e:
             ERROR.logger.error(f"Failed to switch to the default frame: {str(e)}")
             self.take_screenshot("switch_to_default_frame_error")
@@ -1105,9 +1183,10 @@ class BaseCase:
         :Usage:
             result = self.execute_script("return document.title;")
         """
+        self.implicit_wait()
         try:
             result = self.driver.execute_script(script, *args)
-            INFO.logger.info(f"Successfully executed JavaScript code: {script}.")
+            INFO.logger.info(f"Executed JavaScript code: {script}, result: {result}.")
             return result
         except Exception as e:
             ERROR.logger.error(f"Failed to execute JavaScript code: {script}, error message: {str(e)}")
@@ -1126,18 +1205,19 @@ class BaseCase:
             self.scroll_to(x_offset=100, y_offset=200)
             self.scroll_to(element=some_element)
         """
+        self.implicit_wait()
         try:
             self.switch_to_default_frame()  # Switch to the default content
             if element:
                 # Scroll to the element and center it vertically
                 self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
-                INFO.logger.info(f"Successfully scrolled to the element: {element}.")
+                INFO.logger.info(f"Scrolled to element: {element}.")
             elif x_offset is not None or y_offset is not None:
                 # Scroll by the specified offsets
                 x_offset = x_offset or 0
                 y_offset = y_offset or 0
                 self.driver.execute_script(f"window.scrollBy({x_offset}, {y_offset});")
-                INFO.logger.info(f"Successfully scrolled by offsets: x={x_offset}, y={y_offset}.")
+                INFO.logger.info(f"Scrolled by offset: x={x_offset}, y={y_offset}.")
             else:
                 raise ValueError("Either x_offset/y_offset or element must be provided.")
         except Exception as e:
@@ -1152,10 +1232,11 @@ class BaseCase:
         :Usage:
             self.scroll_to_top()
         """
+        self.implicit_wait()
         try:
             self.switch_to_default_frame()  # Switch to the default content
             self.driver.execute_script("window.scrollTo(0, 0);")
-            INFO.logger.info("Successfully scrolled to the top of the page.")
+            INFO.logger.info("Scrolled to the top of current page.")
         except Exception as e:
             ERROR.logger.error(f"Failed to scroll to the top of the page, error message: {str(e)}")
             self.take_screenshot("scroll_to_top_error")
@@ -1168,12 +1249,13 @@ class BaseCase:
         :Usage:
             self.scroll_to_bottom()
         """
+        self.implicit_wait()
         try:
             self.switch_to_default_frame()  # Switch to the default content
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            INFO.logger.info("Successfully scrolled to the bottom of the page.")
+            INFO.logger.info("Scrolled to the bottom of current page.")
         except Exception as e:
-            ERROR.logger.error(f"Failed to scroll to the bottom of the page, error message: {str(e)}")
+            ERROR.logger.error(f"Failed to scroll to the bottom of current page, error message: {str(e)}")
             self.take_screenshot("scroll_to_bottom_error")
             raise
 
@@ -1186,8 +1268,10 @@ class BaseCase:
         :Usage:
             url = self.current_url
         """
+        self.implicit_wait()
         try:
             url = self.driver.current_url
+            INFO.logger.info(f"URL of current page: {url}.")
             return url
         except Exception as e:
             ERROR.logger.error(f"Failed to get the current URL: {str(e)}")
@@ -1203,8 +1287,10 @@ class BaseCase:
         :Usage:
             handle = self.current_window_handle
         """
+        self.implicit_wait()
         try:
             handle = self.driver.current_window_handle
+            INFO.logger.info(f"Window handle of current window: {handle}.")
             return handle
         except Exception as e:
             ERROR.logger.error(f"Failed to get the current window handle: {str(e)}")
@@ -1220,9 +1306,10 @@ class BaseCase:
         :Usage:
             title = self.current_page_title
         """
+        self.implicit_wait()
         try:
             title = self.driver.title
-            INFO.logger.info(f"Successfully obtained the page title: {title}")
+            INFO.logger.info(f"Title of current page: {title}.")
             return title
         except Exception as e:
             ERROR.logger.error(f"Failed to get the page title: {str(e)}")
@@ -1238,9 +1325,10 @@ class BaseCase:
         :Usage:
             source = self.page_source
         """
+        self.implicit_wait()
         try:
             source = self.driver.page_source
-            INFO.logger.info("Successfully obtained the page source code.")
+            INFO.logger.info(f"Code of current page:{source}.")
             return source
         except Exception as e:
             ERROR.logger.error(f"Failed to get the page source code: {str(e)}")
@@ -1261,16 +1349,17 @@ class BaseCase:
         """
         if len(pos) > 5:
             raise ValueError("The maximum number of taps is 5.")
+        self.sleep(0.1)
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.tap(pos, duration)
-                INFO.logger.info(f"Successfully tapped the positions: {pos}.")
+                INFO.logger.info(f"Taped at positions: {pos}.")
+                return self
             else:
-                raise NotImplementedError("The Web end does not support the 'tap' method!")
+                raise NotImplementedError("Not supported 'tap' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(f"Failed to tap the positions: {pos}, error message: {e}")
             raise
-        return self
 
     def drag_and_drop(self, start_element: WebElement, end_element: WebElement, pause: Optional[float] = None) -> Self:
         """
@@ -1288,13 +1377,13 @@ class BaseCase:
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.drag_and_drop(start_element, end_element, pause)
-                INFO.logger.info(f"Successfully dragged the element from {start_element} to {end_element}.")
+                INFO.logger.info(f"Dragged the element from {start_element} to {end_element}.")
+                return self
             else:
-                raise NotImplementedError("The Web end does not support the 'drag_and_drop' method!")
+                raise NotImplementedError("Not supported 'drag_and_drop' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(f"Failed to drag the element from {start_element} to {end_element}, error message: {e}")
             raise
-        return self
 
     def scroll(self, start_element: WebElement, end_element: WebElement, duration: Optional[int] = None) -> Self:
         """
@@ -1312,13 +1401,13 @@ class BaseCase:
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.scroll(start_element, end_element, duration)
-                INFO.logger.info(f"Successfully scrolled from {start_element} to {end_element}.")
+                INFO.logger.info(f"Scrolled from {start_element} to {end_element}.")
+                return self
             else:
-                raise NotImplementedError("The Web end does not support the 'scroll' method!")
+                raise NotImplementedError("Not supported 'scroll' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(f"Failed to scroll from {start_element} to {end_element}, error message: {e}")
             raise
-        return self
 
     def swipe(self, start_x: int, start_y: int, end_x: int, end_y: int, duration: int = None) -> Self:
         """
@@ -1337,15 +1426,14 @@ class BaseCase:
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.swipe(start_x, start_y, end_x, end_y, duration)
-                INFO.logger.info(
-                    f"Successfully swiped from ({start_x}, {start_y}) to ({end_x}, {end_y}) with duration {duration}ms.")
+                INFO.logger.info(f"Swiped from ({start_x}, {start_y}) to ({end_x}, {end_y}) with duration {duration}.")
+                return self
             else:
-                raise NotImplementedError("The Web end does not support the 'swipe' method!")
+                raise NotImplementedError("Not supported 'swipe' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(
                 f"Failed to swipe from ({start_x}, {start_y}) to ({end_x}, {end_y}), error message: {str(e)}")
             raise
-        return self
 
     def flick(self, start_x: int, start_y: int, end_x: int, end_y: int) -> Self:
         """
@@ -1363,13 +1451,13 @@ class BaseCase:
         try:
             if isinstance(self.driver, AppDriver):
                 self.driver.flick(start_x, start_y, end_x, end_y)
-                INFO.logger.info(f"Successfully flicked from ({start_x}, {start_y}) to ({end_x}, {end_y}).")
+                INFO.logger.info(f"Flicked from ({start_x}, {start_y}) to ({end_x}, {end_y}).")
+                return self
             else:
-                raise NotImplementedError("The Web end does not support the 'flick' method!")
+                raise NotImplementedError("Not supported 'flick' method in Web!")
         except WebDriverException as e:
             ERROR.logger.error(f"Failed to flick from ({start_x}, {start_y}) to ({end_x}, {end_y}), error message: {e}")
             raise
-        return self
 
     def alert_accept(self) -> None:
         """

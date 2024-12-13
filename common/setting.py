@@ -67,6 +67,10 @@ class Settings:
             'log_format': '%(asctime)s [%(levelname)s] %(message)s',
             'log_date_format': '%Y-%m-%d %H:%M:%S',
 
+            # App related configuration
+            'apps_dir': ensure_path_sep('\\datas\\apps'),
+            'clean_apps': False,
+
             # Report related configuration
             'report_dir': ensure_path_sep('\\report'),
             'report_tmp': ensure_path_sep('\\report\\tmp'),

@@ -26,6 +26,11 @@ class TestAppLogin(BaseCaseApp):
         """ Success login test case. """
         try:
             INFO.logger.info("Start testing the App login function...")
+            package = self.current_package
+            self.close_app(package)
+            self.uninstall_app(package)
+            self.install_app("仰立.apk")
+            self.start_app(package)
             self.login()
         except Exception as e:
             ERROR.logger.error(f"Failed to test the App login function, error message: {str(e)}")

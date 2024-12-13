@@ -22,6 +22,7 @@ class TestWebLogin(BaseCaseWeb):
         try:
             INFO.logger.info("Start testing the Web login function...")
             self.login()
+            self.assert_title("仰立新材料管理系统")
             self.take_screenshot("after_login")
             self.click("li:contains('特殊作业全过程')")
             self.sleep(1)
