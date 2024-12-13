@@ -12,12 +12,15 @@ from tests.test_base_case import BaseCaseApp
 from utils.log_tool.log_control import INFO, ERROR
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.actions.pointer_input import PointerInput
+
+
 @allure.epic("项目名称: 仰立App自动化测试")
 @allure.feature("登录模块")
 @pytest.mark.app
 @pytest.mark.login
 class TestAppLogin(BaseCaseApp):
     """ Test App login """
+
     @allure.severity(allure.severity_level.BLOCKER)
     @allure.title("登录成功(账号存在+密码正确)")
     @pytest.mark.smoke
@@ -31,7 +34,11 @@ class TestAppLogin(BaseCaseApp):
             self.uninstall_app(package)
             self.install_app("仰立.apk")
             self.start_app(package)
+            self.assert_toast_msg("错误")
             self.login()
+            self.assert_toast_msg("操作成功")
+
+            self.sleep(2)
         except Exception as e:
             ERROR.logger.error(f"Failed to test the App login function, error message: {str(e)}")
             self.take_screenshot("login_failed")

@@ -1,18 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 """
-@ Date        : 2024/11/29 下午5:11
-@ Author      : Administrator
-@ File        : send_mail.py
-@ Description : 功能描述
-"""
-#!/usr/bin/env python
-# -*- coding: UTF-8 -*-
-"""
-@ Date        : 2024/11/16 下午2:51
+@ Date        : 12/13/2024 4:08 PM
 @ Author      : Poco Ray
 @ File        : send_mail.py
-@ Description : 发送邮件通知
+@ Description : Email Notification.
 """
 import smtplib
 from email.mime.text import MIMEText
@@ -21,7 +13,7 @@ from utils import config
 
 
 class SendEmail:
-    """ 发送邮箱 """
+    """ Send message to Email """
 
     def __init__(self, metrics: TestMetrics):
         self.metrics = metrics  # 测试指标

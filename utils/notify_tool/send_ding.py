@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 """
-@ Date        : 2024/11/16 下午6:08
+@ Date        : 12/13/2024 4:04 PM
 @ Author      : Poco Ray
 @ File        : send_ding.py
-@ Description : 钉钉机器人通知
-@ Docs: https://open.dingtalk.com/document/robots/custom-robot-access
+@ Description : DingTalk Robot Notification.
+@ Docs        : https://open.dingtalk.com/document/robots/custom-robot-access
 """
 import base64
 import hashlib
@@ -20,7 +20,7 @@ from utils import config
 
 
 class DingTalkSendMsg:
-    """ 发送钉钉通知 """
+    """ Send message to DingTalk Robot """
 
     def __init__(self, metrics: TestMetrics):
         """

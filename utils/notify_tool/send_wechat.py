@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 """
-@ Date        : 2024/11/16 下午6:16
+@ Date        : 12/13/2024 4:09 PM
 @ Author      : Poco Ray
 @ File        : send_wechat.py
-@ Description : 企业微信消息通知
+@ Description : WeChat Robot Notification.
 """
 import requests
 from utils.log_tool.log_control import ERROR
@@ -16,9 +16,7 @@ from utils import config
 
 
 class WeChatSend:
-    """
-    企业微信消息通知
-    """
+    """ Send message to WeChat Robot """
 
     def __init__(self, metrics: TestMetrics):
         self.metrics = metrics

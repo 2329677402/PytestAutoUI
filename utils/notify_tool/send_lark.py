@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: UTF-8 -*-
 """
-@ Date        : 2024/11/16 下午6:15
+@ Date        : 12/13/2024 4:06 PM
 @ Author      : Poco Ray
 @ File        : send_lark.py
-@ Description : 飞书机器人通知
-@ Docs: https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot
+@ Description : Lark Robot Notification.
+@ Docs        : https://open.feishu.cn/document/client-docs/bot-v3/add-custom-bot
 """
 import base64
 import hashlib
@@ -38,7 +38,7 @@ def is_not_null_and_blank_str(content):
 
 
 class FeiShuTalkChatBot:
-    """飞书机器人通知"""
+    """ Send message to Lark Robot """
 
     def __init__(self, metrics: TestMetrics):
         self.metrics = metrics

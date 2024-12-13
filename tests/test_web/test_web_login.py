@@ -6,7 +6,6 @@
 @ File        : test_web_login.py
 @ Description : Web login test case.
 """
-
 import pytest
 from tests.test_base_case import BaseCaseWeb
 from utils.log_tool.log_control import INFO, ERROR
